@@ -1,1 +1,1 @@
-# evaulation-of-bevfusion-for-3d-object-detection
+# Evaluating Performance of LiDAR and Camera Fused 3D Object Detection Using BEVFusion
