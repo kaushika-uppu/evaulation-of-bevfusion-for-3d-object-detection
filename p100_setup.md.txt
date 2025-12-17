@@ -1,0 +1,227 @@
+BEVFusion + TensorRT + ROS 2 on Tesla P100 (SM_60)
+Complete Setup, Limitations, Fixes, and Runtime Guide
+
+This document explains how to set up and run CUDA-BEVFusion + TensorRT + ROS2 Foxy on an NVIDIA Tesla P100 (Pascal, SM_60).
+
+The P100 is powerful but lacks Tensor Cores and does NOT support Ampere-only kernels required by NVIDIA’s precompiled spconv backend.
+This affects accuracy, but the full pipeline runs at ~10 FPS on P100.
+
+🚨 1. P100 GPU Limitations
+
+BEVFusion's LiDAR backbone uses NVIDIA 3DSparseConvolution (spconv).
+
+NVIDIA ships Ampere-only kernels (SM >= 80).
+
+Your GPU:
+
+GPU	Arch	SM	Tensor Cores	Supports spconv?
+Tesla P100	Pascal	SM 60	❌ None	❌ No
+
+This causes CUDA errors:
+
+no kernel image is available for execution on the device
+cudaErrorNoKernelImageForDevice [209]
+
+Meaning:
+
+The LiDAR backbone cannot run, so LiDAR features contribute almost nothing.
+
+Camera backbone still works → inference runs, but scores stay extremely low (~0.01).
+
+🟩 2. What still works on P100
+Component	Status
+TensorRT FP16 camera backbone	✅
+Camera view transformer	✅
+Fusion + head layers	⚠️ Runs but weak features
+ROS2 Foxy	✅
+Image preprocessing	✅
+PyBind + libpybev	✅
+End-to-end pipeline	Runs at ~9.6 FPS
+Accurate detection	❌ Not possible (LiDAR branch broken)
+📂 3. Workspace structure (mounted)
+
+Inside container:
+
+/root/ros2_ws
+ ├── Lidar_AI_Solution
+ │     └── CUDA-BEVFusion
+ ├── ros2-bevfusion-jetson
+ │     └── ros2_ws
+ └── data/nuscenes
+ └── data/bev_sequence
+
+🐳 4. Docker Container Setup
+ssh edgeaisever 
+
+Host command:
+
+docker run -it --rm \
+  --gpus all \
+  --network host \
+  -v /home/student/ros2_ws:/root/ros2_ws \
+  -v /home/student/DeepDataMiningLearning/data/nuscenes:/root/ros2_ws/data/nuscenes \
+  --name bevfusion_trt8 \
+  nvcr.io/nvidia/tensorrt:22.12-py3 \
+  bash
+
+📦 5. Install Dependencies (inside container)
+apt-get update
+apt-get install -y git git-lfs cmake build-essential \
+    python3-opencv python3-dev \
+    libprotobuf-dev protobuf-compiler \
+    autoconf automake libtool curl unzip
+
+
+NuScenes + ROS message deps:
+
+pip3 install nuscenes-devkit pyquaternion
+apt install -y ros-foxy-vision-msgs ros-foxy-sensor-msgs-py
+
+📌 6. Build Protobuf 3.21.12
+cd /tmp
+git clone https://github.com/protocolbuffers/protobuf.git
+cd protobuf
+git checkout v3.21.12
+./autogen.sh
+./configure
+make -j$(nproc)
+make install
+ldconfig
+
+⚙️ 7. Build CUDA-BEVFusion
+Update ONNX protobufs
+cd /root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/src/onnx
+rm -f *.pb.*
+protoc --proto_path=. --cpp_out=. onnx-ml.proto onnx-operators-ml.proto
+mv *.cc *.cpp
+
+Create tool/environment.sh
+export CUDA_HOME=/usr/local/cuda
+export TensorRT_Bin=/usr/src/tensorrt/bin
+export TensorRT_Lib=/usr/lib/x86_64-linux-gnu
+
+export DEBUG_MODEL=resnet50
+export DEBUG_PRECISION=fp16
+export USE_Python=ON
+
+# P100 architecture
+export CUDASM=60
+
+export LD_LIBRARY_PATH=/root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/build:\
+/root/ros2_ws/Lidar_AI_Solution/libraries/3DSparseConvolution/libspconv/lib/x86_64_cuda11.4:\
+${TensorRT_Lib}:${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+export PYTHONPATH=/root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/build:${PYTHONPATH}
+
+
+Source it:
+
+source tool/environment.sh
+
+🧱 8. Build libpybev + BEVFusion core
+cd /root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion
+rm -rf build
+mkdir build && cd build
+
+cmake .. \
+   -DCMAKE_BUILD_TYPE=Release \
+   -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda \
+   -DCUDA_NVCC_EXECUTABLE=/usr/local/cuda/bin/nvcc \
+   -DUSE_Python=ON
+
+make -j$(nproc)
+
+📥 9. Download model.zip from NVIDIA Box
+cd /root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion
+wget "https://nvidia.box.com/shared/static/vc1ezra9kw7gu7wg3v8cwuiqshwr8b39" -O model.zip
+unzip model.zip -d model
+
+
+This creates:
+
+model/resnet50/*.onnx
+model/resnet50/build/
+
+🛠️ 10. Build TensorRT Engines
+cd /root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion
+bash tool/build_trt_engine.sh
+
+
+Engines produced:
+
+camera.backbone.plan
+camera.vtransform.plan
+fuser.plan
+head.bbox.plan
+
+🧪 11. Convert NuScenes to BEV sequence
+cd /root/ros2_ws/ros2-bevfusion-jetson/ros2_ws/dnn_node/dnn_node
+python3 convert_nuscenes.py
+
+
+Creates:
+
+/root/ros2_ws/data/bev_sequence/
+  *_CAM_*.jpg
+  *_points.npy
+  camera2lidar.tensor
+  camera_intrinsics.tensor
+  img_aug_matrix.tensor
+  lidar2image.tensor
+
+
+Copy calibration into BEVFusion example folder:
+
+cp /root/ros2_ws/data/bev_sequence/*.tensor \
+   /root/ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/example-data/
+
+🤖 12. Install ROS 2 Foxy + colcon
+apt update
+apt install -y ros-foxy-desktop python3-colcon-common-extensions
+source /opt/ros/foxy/setup.bash
+
+🔨 13. Build dnn_node
+cd /root/ros2_ws/ros2-bevfusion-jetson/ros2_ws
+colcon build --packages-select dnn_node --symlink-install --base-paths dnn_node
+source install/setup.bash
+
+▶️ 14. Run Full Pipeline
+Terminal 1 — Inference
+ros2 run dnn_node bev_node
+
+Terminal 2 — Replay Sequence
+ros2 run dnn_node bev_sequence_replay
+
+📊 15. Performance Summary on P100
+
+Example output:
+
+Average Prep Time:     30.93 ms
+Average Inference:     69.14 ms
+Average Publish:        3.41 ms
+Average Total:        103.48 ms
+Average FPS:            9.66
+
+This is excellent performance for a Pascal GPU.
+
+But…
+
+🔥 16. Why You Get 0 Detections
+
+Because P100 cannot run Ampere-only spconv kernels, LiDAR features fail, and detection confidence stays extremely low:
+
+~0.01 score range
+
+thresholding wipes them out
+
+published detections = 0
+
+You will see repeated:
+
+no kernel image is available for execution on the device
+cudaErrorNoKernelImageForDevice
+
+
+This is expected on P100.
+
+
