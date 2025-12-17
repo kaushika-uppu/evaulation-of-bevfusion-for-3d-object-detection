@@ -7,5 +7,5 @@
 
 ## Setting Up Project
 
-For detailed instructions and commands on how this project was setup for the HPC A40 GPU, please refer to the `a40gpu_setup.md` file.
-For detailed instructions and commands on how this project was setup for the P100 GPU, please refer to the `p100_setup.md` file.
+- For detailed instructions and commands on how this project was setup for the HPC A40 GPU, please refer to the `a40gpu_setup.md` file.
+- For detailed instructions and commands on how this project was setup for the P100 GPU, please refer to the `p100_setup.md` file.
