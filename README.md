@@ -10,3 +10,4 @@
 - For detailed instructions and commands on how this project was setup for the HPC A40 GPU, please refer to the `a40gpu_setup.md` file.
 - For detailed instructions and commands on how this project was setup for the P100 GPU, please refer to the `p100_setup.md` file.
 - For detailed instructions and commands on how this project was setup for the Jetson Orin Nano, please refer to the `BEVFusion_SETUP.md` file in the `ros2-bevfusion-jetson-main` folder.
+- For detailed instructions and commands on how this project was setup for the T4 GPU, please refer to the `README.md` file in the `Google colab` folder.
