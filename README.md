@@ -1,10 +1,58 @@
-# Evaluating Performance of LiDAR and Camera Fused 3D Object Detection Using BEVFusion
+# BEVFusion 3D Object Detection and Latency Evaluation on nuScenes-mini
 
-*Kaushika Uppu, Sravani Neelapala, Loi Nguyen, Hau Nguyen*
+1. Introduction
+This project implements and evaluates BEVFusion, a multi-sensor 3D object detection model that fuses LiDAR and camera inputs into a unified Bird's-Eye View (BEV) representation.  
+The goal is to install MMDetection3D and BEVFusion on Google Colab, prepare the nuScenes-mini dataset, load the model, and measure inference latency on GPU.
+
+---
+
+2. Setup Overview
+All experiments were performed in Google Colab using:
+
+- Python 3.10  
+- CUDA 12.4  
+- GPU: NVIDIA L4  
+- PyTorch 2.3.0  
+- MMEngine 0.10.7  
+- MMCV 2.2.0  
+- MMDetection 3.3.0  
+- MMDetection3D 1.4.0  
+
+These versions were chosen for compatibility with BEVFusion and recent CUDA toolchains.
+
+3. Dataset
+We use **nuScenes v1.0-mini**, which contains:
+- 10 scenes  
+- 404 samples  
+- LiDAR + 6 cameras  
+
+Dataset preprocessing was done using the MMDetection3D script:
+
+```bash
+python tools/create_data.py nuscenes --root-path /content/nuscenes \
+  --out-dir ./data/nuscenes --extra-tag nuscenes --version v1.0-mini
 
 
-***Abstract*** — Autonomous driving significantly relies on the ability to detect and localize 3D objects within a complex environment. Two inputs typically used for this problem are LiDAR (Light Detection and Ranging) and cameras. With both technologies having pros and cons, using a fusion of LiDAR and cameras could lead to a more comprehensive 3D perception system with higher accuracy and robustness. This project aimed to integrate BEVFusion, a state-of-the-art multi-sensor fusion framework, into a ROS-2 environment to evaluate 3D object detection on the NuScenes dataset.
+4. BEVFusion Model
 
-## Setting Up Project
+It can be configured using : 
+projects/BEVFusion/configs/bevfusion_lidar-cam_voxel0075_second_secfpn_8xb4-cyclic-20e_nus-3d.py
 
-For detailed instructions and commands on how this project was setup for the HPC A40 GPU, please refer to the `a40gpu_setup.md` file.
+5. Latency Evaluation
+scripts/bevfusion_latency_predict_nuscenes.py
+
+6. Results: 
+
+Mean Latency:296.94ms
+Median Latency:297.11ms
+FPS:3.36
+
+7. Run the colab cells one after another to get the evaluation metrics. 
+
+8. References:
+
+MMDetection3D: https://github.com/open-mmlab/mmdetection3d
+
+BEVFusion Paper: https://doi.org/10.48550/arxiv.2205.13542
+
+nuScenes Dataset: https://www.nuscenes.org
