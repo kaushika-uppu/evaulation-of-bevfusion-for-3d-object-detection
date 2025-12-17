@@ -1,0 +1,53 @@
+##############################
+# Python
+##############################
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.python-version
+
+##############################
+# Jupyter
+##############################
+.ipynb_checkpoints/
+
+##############################
+# ROS 2 / colcon
+##############################
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+ros2_ws/*.log
+
+##############################
+# CUDA-BEVFusion / models
+##############################
+ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/build/
+ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/model/*/build/
+ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/model/*/*.plan
+ros2_ws/Lidar_AI_Solution/CUDA-BEVFusion/model/*/*.engine
+
+##############################
+# Data / logs / videos
+##############################
+ros2_ws/data/
+ros2_ws/logs/
+visualizations/
+*.mp4
+*.avi
+*.mov
+*.npy
+*.tensor
+
+##############################
+# OS / editor cruft
+##############################
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+
